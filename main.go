@@ -39,6 +39,7 @@ func main() {
 		r.Get("/", controller.GetUser)
 
 		r.Route("/{userId}", func(r chi.Router) {
+			r.Post("/", controller.LogoutUser)
 			r.Get("/", controller.GetUserById)
 			r.Patch("/", controller.UpdateUser)
 			r.Delete("/", controller.DeleteUser)

@@ -1,12 +1,11 @@
 package database
 
-
 import (
 	"log"
 
-	"github.com/jinzhu/gorm"
-	_"github.com/jinzhu/gorm/dialects/mysql"
-
+	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var (
@@ -14,15 +13,16 @@ var (
 )
 
 func ConnectDB() {
-	dsn := "root:@tcp(127.0.0.1:3306)/shalomdb?charset=utf8&parseTime=True&loc=Local"
+	dsn := "postgresql://authdb_owner:y1af2TerlsRU@ep-weathered-voice-a5n7l308.us-east-2.aws.neon.tech/authdb?sslmode=require"
 
-	connect, err := gorm.Open("mysql", dsn)
+	connect, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
 	db = connect
+	
 }
 
 
