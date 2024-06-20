@@ -3,7 +3,7 @@ package database
 import (
 	"log"
 
-	_ "github.com/lib/pq"
+	// _ "github.com/lib/pq"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
