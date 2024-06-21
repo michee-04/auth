@@ -56,6 +56,9 @@ func GetAllUser() []User {
 func GetUserById(id string) (*User, *gorm.DB) {
 	var user User
 	db := DB.Where("user_id = ?", id).First(&user)
+	if db.Error != nil {
+		return nil, db
+	}
 	return &user, db
 }
 

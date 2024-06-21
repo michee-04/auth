@@ -2,12 +2,14 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/michee/authentificationApi/model"
 	"github.com/michee/authentificationApi/provider"
 	"github.com/michee/authentificationApi/utils"
+	"gorm.io/gorm"
 )
 
 
@@ -41,6 +43,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
+	
 
 	token, err := provider.GenerateJWT(user.UserId)
 	if err != nil {
@@ -78,45 +81,65 @@ func GetUserById(w http.ResponseWriter, r *http.Request) {
 
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	userUpdate := &model.User{}
-	utils.ParseBody(r, &userUpdate)
+	utils.ParseBody(r, userUpdate)
+
 	userId := chi.URLParam(r, "userId")
 
 	// Vérifier le token avant de continuer
 	if !provider.VerificationToken(r, userId) {
-		http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	userDetail, db := model.GetUserById(userId)
-	if userDetail == nil {
-			http.Error(w, "User not found", http.StatusNotFound)
+			http.Error(w, "Unauthorized: Invalid token", http.StatusUnauthorized)
 			return
 	}
 
-	if userUpdate.Name != "" {
-			userDetail.Name = userUpdate.Name
+	var userDetail model.User
+	err := model.DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Where("user_id = ?", userId).First(&userDetail).Error; err != nil {
+					return err
+			}
+
+			// Mettre à jour les champs modifiés
+			if userUpdate.Name != "" {
+					userDetail.Name = userUpdate.Name
+			}
+			if userUpdate.UserName != "" {
+					userDetail.UserName = userUpdate.UserName
+			}
+			if userUpdate.Email != "" {
+					userDetail.Email = userUpdate.Email
+			}
+			if userUpdate.Password != "" {
+					hashedPassword, err := utils.HashPassword(userUpdate.Password)
+					if err != nil {
+							return err
+					}
+					userDetail.Password = hashedPassword
+			}
+
+			return tx.Save(&userDetail).Error
+	})
+
+	if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+					http.Error(w, "User not found", http.StatusNotFound)
+			} else {
+					http.Error(w, "Failed to update user: "+err.Error(), http.StatusInternalServerError)
+			}
+			return
 	}
 
-	if userUpdate.UserName != "" {
-			userDetail.UserName = userUpdate.UserName
+	res, err := json.Marshal(userDetail)
+	if err != nil {
+			http.Error(w, "Failed to serialize user data", http.StatusInternalServerError)
+			return
 	}
 
-	if userUpdate.Email != "" {
-			userDetail.Email = userUpdate.Email
-	}
-
-	if userUpdate.Password != "" {
-			hashedPassword, _ := utils.HashPassword(userUpdate.Password)
-			userDetail.Password = hashedPassword
-	}
-
-	db.Save(&userDetail)
-
-	res, _ := json.Marshal(userDetail)
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
 }
+
+
+
 
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
